@@ -1,0 +1,15 @@
+import org.apache.spark.sql
+val movies=spark.read.format("csv").option("header","true").load("/FileStore/tables/movies.csv")
+val rating_raw=spark.read.format("csv").option("header","true").load("/FileStore/tables/ratings.csv")
+val rating=rating_raw.withColumn("rating",$"rating".cast(sql.types.FloatType))
+val tags=spark.read.format("csv").option("header","true").load("/FileStore/tables/tags.csv")
+val action_movies = tags.filter("tag = 'action'").select("movieId").distinct
+val average_rating=rating.groupBy("movieId").avg("rating")
+val avg_action_movies= action_movies.join(average_rating, "movieId")
+val avg_action_movie_ratings = movies.join(avg_action_movies, "movieId")
+val output_c = avg_action_movie_ratings.select("title", "avg(rating)")
+val thrill_movies = movies.filter($"genres".contains("Thriller")).select("movieId")
+val avg_thriller_action_movie_ratings = thrill_movies.join(avg_action_movie_ratings, "movieId")
+val output_4 = avg_thriller_action_movie_ratings.select("title", "avg(rating)")
+dbutils.fs.rm("/FileStore/tables/question_3d", true)
+output_4.repartition(1).write.format("csv").option("header", "true").save("/FileStore/tables/question_3d")

@@ -1,0 +1,22 @@
+val data1 = sc.textFile("/FileStore/tables/movies.csv")
+val header1 = data1.first()
+val movies = data1.filter(row => row != header1).map(_.split(",").map(_.trim))
+movies.collect()
+
+val data2 = sc.textFile("/FileStore/tables/ratings.csv")
+val header2 = data2.first()
+val ratings= data2.filter(row => row != header2).map(_.split(",").map(_.trim))
+ratings.collect()
+
+val joined = movies.map(e=>(e(0),e(1))).join(ratings.map(e=>(e(1),e(2).toFloat)))
+
+val local_value = joined.map(v => (v._2._1, v._2._2))
+
+val averages = local_value.aggregateByKey((0,0.0))((t,e) => (t._1 + 1, t._2 + e),
+        (t1,t2) => (t1._1 + t2._1, t1._2 + t2._2)).mapValues(t => t._2/t._1)
+val sorted_list_movies=averages.map(item => item.swap).sortByKey(true, 1).map(item => item.swap)
+val sorted_list_temp=sorted_list_movies.collect().take(10)
+dbutils.fs.rm("/question_3_b",true)
+val sorted_list=sc.parallelize(sorted_list_temp)
+sorted_list.map(e=>(e._1+"\t"+e._2)).repartition(1).saveAsTextFile("/question_3_b")
+dbutils.fs.cp("/question_3_b/part-00000","dbfs:/FileStore/tables/output_q3_b.txt",true)
